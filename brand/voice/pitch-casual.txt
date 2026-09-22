@@ -1,11 +1,4 @@
-# Gapguard — pitch script (casual, ~90 s)
-
-Narrated by Gemini TTS (voice: Achird) in `voice/pitch-Achird.wav`; the pitch video is `video/pitch.mp4`.
-Rebuild after any change: `python3 voice/tts.py voice/pitch-casual.txt voice/pitch-Achird.wav Achird`,
-then `python3 voice/timing.py voice/pitch-Achird.wav` (from `brand/voice/`), then `video/make-pitch.sh`.
-To record it yourself instead, read the lines below — the video re-times itself to any narration.
-
----
+Read this like a real person talking, not a narrator or voice actor. Understated, relaxed, conversational, like a founder explaining their project to a friend. Let the pace vary naturally. Don't stress or punch the numbers, no dramatic pauses, no sing-song rise and fall at the ends of sentences. Slightly casual is good.
 
 So, tokenized stocks trade twenty-four seven, right? But the actual stock market closes at four. And once it's closed, the issuer can't mint or redeem, and there's no real price to check against. So on weekends the liquidity providers are basically just eating that whole gap. For free.
 

@@ -1,0 +1,144 @@
+1
+00:00:00,000 --> 00:00:03,810
+So, tokenized stocks trade 24/7, right?
+
+2
+00:00:04,100 --> 00:00:06,390
+But the actual stock market closes at 4.
+
+3
+00:00:06,920 --> 00:00:10,090
+And once it's closed, the issuer can't mint or redeem.
+
+4
+00:00:10,800 --> 00:00:12,650
+And there's no real price to check against.
+
+5
+00:00:13,220 --> 00:00:17,030
+So on weekends, the liquidity providers are basically just eating that whole
+
+6
+00:00:16,880 --> 00:00:18,030
+gap, for free.
+
+7
+00:00:18,900 --> 00:00:20,010
+And this actually happened.
+
+8
+00:00:20,520 --> 00:00:23,870
+Back in August, a memecoin on Robinhood Chain paired itself against
+
+9
+00:00:23,720 --> 00:00:25,130
+tokenized Hims & Hers.
+
+10
+00:00:25,640 --> 00:00:29,090
+And over one weekend, the wrapper ran up to about 61 bucks.
+
+11
+00:00:28,940 --> 00:00:31,670
+The real stock had closed under 29.
+
+12
+00:00:32,300 --> 00:00:35,030
+None of the big pools on the chain had any idea the
+
+13
+00:00:34,880 --> 00:00:35,850
+market was even closed.
+
+14
+00:00:36,740 --> 00:00:37,970
+So I built Gapguard.
+
+15
+00:00:38,440 --> 00:00:41,310
+It's a Uniswap v4 hook that prices the closed market.
+
+16
+00:00:41,800 --> 00:00:44,390
+It works out the New York Stock Exchange calendar on-chain.
+
+17
+00:00:44,800 --> 00:00:47,610
+Holidays, half days, daylight saving, all of it.
+
+18
+00:00:47,740 --> 00:00:48,250
+No oracle.
+
+19
+00:00:49,080 --> 00:00:51,410
+When the market's open, you just pay the normal fee.
+
+20
+00:00:51,920 --> 00:00:54,390
+When it's closed, you pay for the gap risk you're creating.
+
+21
+00:00:54,900 --> 00:00:57,650
+And the further you push the price from the last close, the
+
+22
+00:00:57,500 --> 00:00:58,110
+more it costs.
+
+23
+00:00:58,740 --> 00:01:01,550
+If you're trading back toward it, so you're helping restore the peg,
+
+24
+00:01:01,860 --> 00:01:02,550
+it stays cheap.
+
+25
+00:01:03,320 --> 00:01:06,350
+I replayed that Hims weekend on-chain, and the LPs end up
+
+26
+00:01:06,200 --> 00:01:08,330
+earning almost 13 times more.
+
+27
+00:01:08,920 --> 00:01:11,250
+It's live on Robinhood Chain mainnet right now.
+
+28
+00:01:11,580 --> 00:01:14,130
+No owner, no admin keys, and it can't be upgraded.
+
+29
+00:01:14,800 --> 00:01:18,130
+It's been through three security reviews and 39 tests, and the source
+
+30
+00:01:17,980 --> 00:01:18,510
+is verified.
+
+31
+00:01:19,520 --> 00:01:22,210
+Robinhood Chain is where tokenized stocks are going to live.
+
+32
+00:01:22,660 --> 00:01:25,390
+And Gapguard is how you make it safe to provide liquidity for
+
+33
+00:01:25,240 --> 00:01:26,210
+them after the bell.
+
+34
+00:01:26,860 --> 00:01:27,290
+I'm David.
+
+35
+00:01:27,620 --> 00:01:29,870
+I'm an Air Force vet, and I build on-chain stuff.
+
+36
+00:01:30,220 --> 00:01:31,090
+This is Gapguard.
+

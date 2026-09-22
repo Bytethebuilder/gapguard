@@ -1,0 +1,17 @@
+Read this as a calm, confident founder pitch, conversational and unhurried, with short natural pauses between paragraphs:
+
+Tokenized stocks trade twenty-four seven. The real stock market closes at four.
+
+When it's closed, the issuer can't mint or redeem, and there's no real price to arbitrage against. So every weekend, liquidity providers carry the whole gap, for free.
+
+On August twenty-ninth, a memecoin on Robinhood Chain paired itself against tokenized Hims and Hers. The wrapper hit sixty-one dollars against a twenty-eight dollar close. Plus a hundred and twelve percent. Not one of the chain's top pools had a fee that knew the market was closed.
+
+Gapguard is a Uniswap v4 hook that prices the closed market. It computes the New York Stock Exchange calendar on-chain: daylight saving, holidays, half-days. No oracle. While the market's open, it charges the normal fee. While it's closed, swaps pay for the gap risk they create, and the further they push price from the last close, the more they pay. Flow that restores the peg stays cheap.
+
+Replaying that weekend on-chain, liquidity providers earn twelve point seven times more.
+
+It's live on Robinhood Chain mainnet today. No owner, no admin, no upgrades. Three adversarial security reviews, thirty-nine tests, source verified.
+
+Robinhood Chain is where tokenized stocks live. Gapguard makes it safe to provide liquidity for them after the bell.
+
+I'm David, a U.S. Air Force veteran building on-chain infrastructure. This is Gapguard.
