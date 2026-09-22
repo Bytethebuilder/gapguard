@@ -2,4 +2,4 @@ out/
 cache/
 .env
 broadcast/
-lib
+web/.vercel
