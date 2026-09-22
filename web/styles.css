@@ -369,6 +369,8 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 /* ------------------------------------------------------------------ hook revenue */
 .panel.rev { margin-top: 20px; }
 .rev-h { margin: 0; font: inherit; letter-spacing: inherit; }
+.rev-wallet { font: 400 13px var(--f-mono); color: var(--paper); background: transparent; border: 1px solid var(--rule); border-radius: 0; padding: 10px 12px; min-height: 44px; }
+.rev-wallet[hidden] { display: none; }
 .rev-body { padding: 20px; display: grid; gap: 16px; }
 .rev-lede { margin: 0; font-size: 16px; color: var(--paper-2); max-width: 60em; }
 .rev-recipients { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px var(--f-mono); color: var(--paper-2); }

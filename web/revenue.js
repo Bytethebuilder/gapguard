@@ -5,6 +5,35 @@
 import { createWalletClient, custom, formatUnits, getAddress } from "./viem.js";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
+
+// ------------------------------------------------------------------ wallet discovery
+// With several extensions installed, whichever injected last owns window.ethereum (often not the one
+// the user wants). EIP-6963 lets each wallet announce itself, so we can pick MetaMask explicitly.
+const METAMASK_RDNS = ["io.metamask", "io.metamask.flask"];
+const wallets = []; // { info: { uuid, name, rdns }, provider }
+const walletListeners = new Set();
+if (typeof window !== "undefined") {
+  window.addEventListener("eip6963:announceProvider", (e) => {
+    const d = e.detail;
+    if (!d?.provider || !d.info || wallets.some((w) => w.info.uuid === d.info.uuid)) return;
+    wallets.push(d);
+    walletListeners.forEach((f) => f());
+  });
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+}
+
+/** All usable wallets, MetaMask first. Falls back to legacy window.ethereum when nothing announces. */
+function walletOptions() {
+  const list = [...wallets];
+  if (!list.length && typeof window !== "undefined" && window.ethereum) {
+    const legacy = window.ethereum.providers || [window.ethereum];
+    legacy.forEach((p, i) => list.push({
+      info: { uuid: "legacy-" + i, name: p.isMetaMask && !p.isTrust && !p.isTrustWallet ? "MetaMask" : "Browser wallet", rdns: p.isMetaMask && !p.isTrust && !p.isTrustWallet ? "io.metamask" : "" },
+      provider: p,
+    }));
+  }
+  return list.sort((a, b) => Number(METAMASK_RDNS.includes(b.info.rdns)) - Number(METAMASK_RDNS.includes(a.info.rdns)));
+}
 const DECIMALS = 18;
 
 const HOOK_ABI = [
@@ -129,10 +158,29 @@ export function makeRevenue(cfg, client, $) {
     if (!state) { btn.disabled = true; btn.textContent = "Checking…"; return; }
     const any = state.some((r) => r.pending);
     if (!any) { btn.disabled = true; btn.textContent = "Nothing to collect"; return; }
-    if (!window.ethereum) { btn.disabled = true; btn.textContent = "Install a wallet to collect"; return; }
+    const w = selectedWallet();
+    if (!w) { btn.disabled = true; btn.textContent = "Install a wallet to collect"; return; }
     btn.disabled = false;
-    btn.textContent = "Collect fees";
+    btn.textContent = `Collect fees with ${w.info.name}`;
   }
+
+  // Wallet picker: shown only when more than one wallet is installed; MetaMask is the default.
+  let chosenUuid = null;
+  function selectedWallet() {
+    const opts = walletOptions();
+    return opts.find((w) => w.info.uuid === chosenUuid) || opts[0] || null;
+  }
+  function renderWalletPicker() {
+    const sel = $("revWallet");
+    const opts = walletOptions();
+    sel.hidden = opts.length < 2;
+    const current = selectedWallet();
+    sel.innerHTML = opts.map((w) =>
+      `<option value="${esc(w.info.uuid)}"${w === current ? " selected" : ""}>${esc(w.info.name)}</option>`).join("");
+    updateButton();
+  }
+  $("revWallet").addEventListener("change", (e) => { chosenUuid = e.target.value; updateButton(); });
+  walletListeners.add(renderWalletPicker);
 
   async function refresh() {
     if (busy) return; // the collect flow re-reads on its own
@@ -201,7 +249,7 @@ export function makeRevenue(cfg, client, $) {
   }
 
   async function collectAll() {
-    const provider = window.ethereum;
+    const provider = selectedWallet()?.provider;
     if (!provider || busy) return;
     busy = true;
     updateButton();
@@ -255,5 +303,6 @@ export function makeRevenue(cfg, client, $) {
   }
 
   $("revCollect").addEventListener("click", collectAll);
+  renderWalletPicker();
   return { refresh, updateButton };
 }
