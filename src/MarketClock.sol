@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-/// @title MarketClock — US equity session calendar computed from block.timestamp
-/// @notice Answers "is the underlying stock market open right now?" with no oracle and no keeper.
-///         US Eastern time is derived on-chain, including the daylight-saving switch (second Sunday
-///         of March 02:00 local → first Sunday of November 02:00 local). Holidays are supplied by the
-///         caller as Eastern-local day numbers; weekends are handled here.
-/// @dev Early closes (e.g. 13:00 on the day after Thanksgiving) are not modelled: those afternoons
-///      read as open, so the hook charges base fee — the conservative direction for traders.
+/// @title MarketClock — NYSE session calendar computed from block.timestamp
+/// @notice Answers "is the US stock market open right now?" with no oracle, no keeper and no list to
+///         maintain. US Eastern time is derived onchain, including the daylight-saving switch (second
+///         Sunday of March 02:00 local → first Sunday of November 02:00 local), and NYSE's holiday and
+///         early-close rules are evaluated as rules, so the calendar never runs out.
+/// @dev Holidays (NYSE Rule 7.2): New Year's Day (not observed when it falls on a Saturday), Martin
+///      Luther King Jr. Day, Washington's Birthday, Good Friday, Memorial Day, Juneteenth, Independence
+///      Day, Labor Day, Thanksgiving, Christmas. Saturday holidays are observed the Friday before,
+///      Sunday holidays the Monday after. Early 13:00 closes: July 3 (Mon–Thu), the day after
+///      Thanksgiving, Christmas Eve (Mon–Thu). Unscheduled closures cannot be predicted by rule.
 library MarketClock {
     uint256 internal constant DAY = 86_400;
+    uint16 internal constant EARLY_CLOSE_MINUTE = 780; // 13:00 ET
 
     /// @notice Unix time shifted into US Eastern local time.
     function easternLocal(uint256 ts) internal pure returns (uint256) {
         return ts - (isDst(ts) ? 4 hours : 5 hours);
     }
 
-    /// @notice Days since 1970-01-01 in Eastern local time. This is the key used for holidays.
+    /// @notice Days since 1970-01-01 in Eastern local time.
     function easternDay(uint256 ts) internal pure returns (uint256) {
         return easternLocal(ts) / DAY;
     }
@@ -26,14 +30,73 @@ library MarketClock {
         return (dayNumber + 4) % 7;
     }
 
-    /// @notice True between openMinute and closeMinute (Eastern, minutes after midnight) on a
-    ///         weekday that is not a holiday. Holiday lookup is delegated so storage stays with the caller.
-    function isOpen(uint256 ts, uint16 openMinute, uint16 closeMinute, bool holiday) internal pure returns (bool) {
+    /// @notice True between openMinute and the day's close (Eastern minutes after midnight) on a NYSE
+    ///         trading day. `extraClosure` marks an unscheduled closure supplied by the caller.
+    function isOpen(uint256 ts, uint16 openMinute, uint16 closeMinute, bool extraClosure) internal pure returns (bool) {
         uint256 local = easternLocal(ts);
-        uint256 wd = weekday(local / DAY);
-        if (wd == 0 || wd == 6 || holiday) return false;
+        uint256 day = local / DAY;
+        if (extraClosure || !isTradingDay(day)) return false;
         uint256 minute = (local % DAY) / 60;
-        return minute >= openMinute && minute < closeMinute;
+        return minute >= openMinute && minute < closeMinuteOn(day, closeMinute);
+    }
+
+    /// @notice Weekday that is not a NYSE holiday.
+    function isTradingDay(uint256 day) internal pure returns (bool) {
+        uint256 wd = weekday(day);
+        return wd != 0 && wd != 6 && !isHoliday(day);
+    }
+
+    /// @notice The session's close on `day`, honouring NYSE early closes.
+    function closeMinuteOn(uint256 day, uint16 closeMinute) internal pure returns (uint16) {
+        return isEarlyClose(day) && closeMinute > EARLY_CLOSE_MINUTE ? EARLY_CLOSE_MINUTE : closeMinute;
+    }
+
+    function isHoliday(uint256 day) internal pure returns (bool) {
+        (uint256 y, uint256 m, uint256 d) = civilFromDays(day);
+        uint256 wd = weekday(day);
+        if (wd == 0 || wd == 6) return false;
+
+        if (m == 1) {
+            // New Year's Day; a Sunday one moves to Monday, a Saturday one is not observed.
+            if (d == 1 || (d == 2 && wd == 1)) return true;
+            return wd == 1 && d >= 15 && d <= 21; // MLK Day: third Monday
+        }
+        if (m == 2) return wd == 1 && d >= 15 && d <= 21; // Washington's Birthday: third Monday
+        if (day + 2 == easter(y)) return true; // Good Friday
+        if (m == 5) return wd == 1 && d >= 25; // Memorial Day: last Monday
+        if (m == 6) return y >= 2022 && _observed(d, wd, 19); // Juneteenth
+        if (m == 7) return _observed(d, wd, 4); // Independence Day
+        if (m == 9) return wd == 1 && d <= 7; // Labor Day: first Monday
+        if (m == 11) return wd == 4 && d >= 22 && d <= 28; // Thanksgiving: fourth Thursday
+        if (m == 12) return _observed(d, wd, 25); // Christmas
+        return false;
+    }
+
+    function isEarlyClose(uint256 day) internal pure returns (bool) {
+        (, uint256 m, uint256 d) = civilFromDays(day);
+        uint256 wd = weekday(day);
+        if (m == 7 && d == 3) return wd >= 1 && wd <= 4;
+        if (m == 11) return wd == 5 && d >= 23 && d <= 29; // day after Thanksgiving
+        if (m == 12 && d == 24) return wd >= 1 && wd <= 4;
+        return false;
+    }
+
+    /// @dev Weekday `d` observes a fixed-date holiday on `date` (Saturday → Friday, Sunday → Monday).
+    function _observed(uint256 d, uint256 wd, uint256 date) private pure returns (bool) {
+        return d == date || (d + 1 == date && wd == 5) || (d == date + 1 && wd == 1);
+    }
+
+    /// @notice Easter Sunday of year `y` as a day number (anonymous Gregorian algorithm).
+    function easter(uint256 y) internal pure returns (uint256) {
+        uint256 a = y % 19;
+        uint256 b = y / 100;
+        uint256 c = y % 100;
+        uint256 h = (19 * a + b - b / 4 - (b - (b + 8) / 25 + 1) / 3 + 15) % 30;
+        uint256 l = (32 + 2 * (b % 4) + 2 * (c / 4) - h - (c % 4)) % 7;
+        uint256 mm = (a + 11 * h + 22 * l) / 451;
+        uint256 month = (h + l - 7 * mm + 114) / 31;
+        uint256 dd = ((h + l - 7 * mm + 114) % 31) + 1;
+        return daysFromCivil(y, month, dd);
     }
 
     /// @notice US daylight saving time, evaluated at UTC instant `ts`.

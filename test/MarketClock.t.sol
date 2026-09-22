@@ -47,8 +47,63 @@ contract MarketClockTest is Test {
 
     function test_holidayClosed() public pure {
         uint256 thanksgiving = 1_795_705_200; // Thu 2026-11-26 15:00 UTC = 10:00 EST
-        assertTrue(open(thanksgiving));
         assertEq(MarketClock.easternDay(thanksgiving), 20_783);
-        assertFalse(MarketClock.isOpen(thanksgiving, OPEN, CLOSE, true));
+        assertFalse(open(thanksgiving), "computed by rule, no list needed");
+    }
+
+    /// Every NYSE full closure 2026–2028, checked against the published calendar.
+    function test_nyseHolidaysByRule() public pure {
+        uint16[29] memory ymd = [
+            uint16(0x0101), 0x0113, 0x0210, 0x0403, 0x0519, 0x0613, 0x0703, 0x0907, 0x0B1A, 0x0C19, // 2026
+            0x0101, 0x0112, 0x020F, 0x031A, 0x051F, 0x0612, 0x0705, 0x0906, 0x0B19, 0x0C18, // 2027
+            0x0111, 0x0215, 0x040E, 0x051D, 0x0613, 0x0704, 0x0904, 0x0B17, 0x0C19 // 2028
+        ];
+        for (uint256 i; i < 29; ++i) {
+            uint256 y = i < 10 ? 2026 : i < 20 ? 2027 : 2028;
+            uint256 day = MarketClock.daysFromCivil(y, ymd[i] >> 8, ymd[i] & 0xff);
+            assertTrue(MarketClock.isHoliday(day), "listed NYSE holiday not detected");
+            assertFalse(MarketClock.isTradingDay(day));
+        }
+    }
+
+    /// No false positives: across 2026–2028 the rules flag exactly the 29 published closures.
+    function test_noExtraHolidays() public pure {
+        uint256 start = MarketClock.daysFromCivil(2026, 1, 1);
+        uint256 end = MarketClock.daysFromCivil(2029, 1, 1);
+        uint256 n;
+        for (uint256 day = start; day < end; ++day) {
+            if (MarketClock.isHoliday(day)) ++n;
+        }
+        assertEq(n, 29);
+    }
+
+    function test_holidayEdgeRules() public pure {
+        // New Year's Day on a Sunday moves to Monday 2023-01-02.
+        assertTrue(MarketClock.isHoliday(MarketClock.daysFromCivil(2023, 1, 2)));
+        // New Year's Day 2028 is a Saturday and is NOT observed on Friday 2027-12-31.
+        assertTrue(MarketClock.isTradingDay(MarketClock.daysFromCivil(2027, 12, 31)));
+        // Juneteenth only from 2022.
+        assertTrue(MarketClock.isTradingDay(MarketClock.daysFromCivil(2021, 6, 18)));
+        // Good Friday 2025 and 2030 (Easter Apr 20, Apr 21).
+        assertTrue(MarketClock.isHoliday(MarketClock.daysFromCivil(2025, 4, 18)));
+        assertTrue(MarketClock.isHoliday(MarketClock.daysFromCivil(2030, 4, 19)));
+        // Ordinary days stay open.
+        assertTrue(MarketClock.isTradingDay(MarketClock.daysFromCivil(2026, 9, 21)));
+        assertTrue(MarketClock.isTradingDay(MarketClock.daysFromCivil(2026, 12, 28)));
+    }
+
+    function test_earlyCloses() public pure {
+        assertTrue(open(1_795_802_340)); //  Fri 2026-11-27 12:59 EST (day after Thanksgiving)
+        assertFalse(open(1_795_802_400)); // 13:00 EST
+        assertTrue(open(1_798_135_140)); //  Thu 2026-12-24 12:59 EST
+        assertFalse(open(1_798_135_140 + 60));
+        assertTrue(open(1_751_561_940)); //  Thu 2025-07-03 12:59 EDT
+        assertFalse(open(1_751_562_000)); // 13:00 EDT
+        // A July 3rd that is itself the observed holiday (2026, a Friday) is a full closure.
+        assertFalse(MarketClock.isTradingDay(MarketClock.daysFromCivil(2026, 7, 3)));
+    }
+
+    function test_extraClosureFlag() public pure {
+        assertFalse(MarketClock.isOpen(1_789_999_200, OPEN, CLOSE, true));
     }
 }

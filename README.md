@@ -14,56 +14,79 @@ Across the chain's top pools, **zero used a dynamic fee**. Nothing priced the cl
 
 ## How it works
 
-| Market | Fee |
+| Market | What a swap pays |
 |---|---|
-| Open (NYSE 09:30–16:00 ET, weekdays, not a holiday) | `baseFee`. The pool price is recorded as the reference "last close". |
-| Closed, swap moves price **toward** the last close | `baseFee + closedSurcharge` |
-| Closed, swap moves price **away** from the last close | `baseFee + closedSurcharge + min(drift × coefficient, cap)` |
+| Open (NYSE session, computed onchain) | `baseFee` (0.30%). The time-weighted "last close" anchor follows the pool price. |
+| Closed, swap moves price **toward** the anchor | `baseFee + closedSurcharge` (0.50%) |
+| Closed, swap moves price **away** from the anchor | `+ min((distance + 50) × 0.002%/tick, 4.5%)` drift surcharge |
+| Closed, any swap | may move the price at most **100 ticks (~1%)** |
 
-- The market clock runs onchain from `block.timestamp`, including the US daylight-saving switch.
-  No oracle, no keeper.
-- Holidays are fixed at deployment (NYSE 2026–2027 in the deploy script).
-- Flow that restores the peg stays cheap; flow that stretches it pays for the risk it creates.
-- The hook takes a capped slice of the **surcharge only**, split between a protocol and a pool
-  operator. It never touches the base fee, and earns nothing while the market is open.
+- **Everything is an LP fee.** The surcharges are set through v4's dynamic fee override, so they
+  accrue along the swap's path to the liquidity that actually filled it. There is no lump-sum payout
+  for just-in-time liquidity to capture, and `quoteFee` doesn't depend on swap size.
+- **Repricing can't be dodged by splitting.** While the market is closed a single swap can move the
+  price at most `maxClosedMoveTicks`. A bigger move takes several swaps, and drift is priced at the
+  midpoint of a full step (`distance + limit/2`), so splitting into smaller swaps never makes a move
+  cheaper — tiny steps pay at most ~0.1% more than steps at the limit.
+- **Onchain NYSE calendar.** Eastern time with DST, and NYSE's holiday and early-close rules
+  (weekend observance, nth-weekday holidays, Good Friday from Easter, 13:00 half-days) are computed
+  by rule — no oracle, no keeper, and no list that runs out.
+- **Time-weighted anchor.** A price moves the anchor only in proportion to how long it held during
+  market hours — clipped exactly against each trading session — with full weight after 30 minutes.
+  Pushing the price just before the close barely moves it: the push would have to survive half an
+  hour while the issuer can mint and redeem. Closed-market prices carry no weight.
+- **Who gets paid.** LPs get the base fee and ~85% of the surcharges. The hook keeps 15% of the
+  surcharges — taken out of them, never added on top, never from the base fee. It is booked as
+  ERC-6909 claims (no tokens move mid-swap), turned into tokens by anyone via `collect`, then split
+  between two immutable recipients through pull-based payouts (`distribute`, `withdraw`).
 
 ## Safety
 
-No owner, no admin, no pause, no proxy. Every parameter, the holiday calendar and both fee
-recipients are immutable.
+No owner, no admin, no pause, no proxy. Every parameter and both fee recipients are immutable.
 
 | Property | Enforcement |
 |---|---|
-| Total LP fee ≤ 10% | `MAX_TOTAL_FEE`, checked at construction |
-| Hook's cut ≤ 20% of surcharge | `MAX_SKIM_BIPS`, checked at construction |
-| Every callback PoolManager-only | `onlyPoolManager` on all IHooks entrypoints |
+| base + closed + drift ≤ 10% | `MAX_TOTAL_FEE`, checked at construction |
+| Hook's share ≤ 20% of the surcharges | `MAX_SKIM_BIPS`, checked at construction |
+| Closed-market move per swap | `maxClosedMoveTicks`, enforced in `afterSwap` |
+| Every callback PoolManager-only | `onlyPoolManager`; ETH only accepted from the PoolManager |
 | Pool must be dynamic-fee | `afterInitialize` reverts otherwise |
-| No liquidity or donate access | those permission bits are not set |
+| No liquidity access | those permission bits are not set |
+
+Reviewed adversarially three times before deployment. Every confirmed finding is fixed and pinned
+by a test in [`test/GapguardHook.t.sol`](test/GapguardHook.t.sol): ETH pools in all four swap modes,
+dust-swap anchor freezing, whole-session gaps, split-swap drift dodging, the move limit, exact-output
+swaps into one-sided pools, and last-second close manipulation. Key tests were mutation-checked (the protection removed → the test
+fails).
 
 ## Weekend replay
 
 `forge test --mc HimsReplay -vv` replays the squeeze shape — 30 one-way buys while the market is
-closed — through a static 0.30% pool and a Gapguard pool with identical liquidity.
+closed, each routed in ≤100-tick steps — through a static 0.30% pool and a Gapguard pool with
+identical liquidity. Everything is measured onchain (LP fee growth, hook balance), valued in quote
+at the post-swap price.
 
 | | Static 0.30% | Gapguard |
 |---|---|---|
-| Premium over last close | +118.6% | +112.9% |
-| LP fees earned | 0.144 | **2.095** (14.5×) |
-| Average fee paid | 0.30% | 4.37% |
-| Hook revenue | 0 | 0.18 stock tokens |
+| Premium over last close | +118.6% | +113.6% |
+| LP income | 0.144 | **1.834** (12.7×) |
+| Hook revenue | 0 | 0.289 |
+| All-in cost to weekend buyers | 0.30% | 4.43% |
 
-Stated plainly: a fee cannot stop a squeeze driven by real demand, and the premium only falls
-modestly. What Gapguard changes is **who gets paid for it** — LPs earn 14.5× more for carrying the
-weekend gap. This is a calibrated model of the event, not a replay of its actual transactions.
+Stated plainly: a fee cannot stop a squeeze driven by real demand; the premium falls only modestly.
+What Gapguard changes is **who gets paid for it** — LPs earn about 13× more for carrying the weekend
+gap, paid by the flow that creates it. This is a calibrated model of the event, not a replay of its
+actual transactions.
 
 ## Run it
 
 ```bash
-forge test                  # 17 tests: market clock, hook behaviour, weekend replay
+forge test                  # calendar rules, hook behaviour, review regressions, weekend replay
 forge test --mc HimsReplay -vv
 ```
 
-Deploy the hook plus a live demo pool (mock gHIMS/gUSD):
+Deploy the hook plus a live demo pool (fixed-supply gSTOCK/gUSD demo tokens, liquidity locked in an
+add-only holder):
 
 ```bash
 POOL_MANAGER=0x... PROTOCOL_RECIPIENT=0x... OPERATOR_RECIPIENT=0x... \
@@ -72,10 +95,18 @@ POOL_MANAGER=0x... PROTOCOL_RECIPIENT=0x... OPERATOR_RECIPIENT=0x... \
 
 ## Limits
 
-- The drift surcharge is priced from the pre-swap price, so it escalates across a run of
-  same-direction swaps rather than within one large swap. `closedSurcharge` covers the first.
-- Early closes (13:00 ET half-days) read as open, so those afternoons charge the base fee.
-- The holiday list covers 2026–2027. A new calendar means a new hook — by design, nobody can edit it.
+- **Size while closed.** A closed-market swap that would move the price more than ~1% reverts, and
+  the standard v4 router can't partially fill, so the largest trade is roughly the pool's depth over
+  1%. Quoters simulate the hook, so aggregators see the revert and route elsewhere. If LPs pull
+  liquidity for the weekend, the pool gets thin. That is the point — but it is a real constraint.
+- **The hook's share** is charged on the swap's unspecified amount (the output for exact-input
+  swaps), so `quoteFee` is approximate by a hair.
+- **Fixed forever.** Unscheduled closures (e.g. a national day of mourning) or new NYSE holidays read
+  as open unless listed at deployment. Stock splits need more repricing than the closed-market limit
+  allows until the market reopens. Rebasing tokens and recipients that can't receive ETH are not
+  supported.
+- **Demo pool.** Its liquidity sits in an add-only holder (one add per position) and can never be
+  removed or its fees collected — the demo tokens are worthless by design.
 
 ## License
 
