@@ -343,6 +343,7 @@ async function startLive() {
   if (!NET.hook) {
     panel.dataset.state = "idle";
     $("panelStatus").textContent = "Awaiting deployment";
+    $("revCollect").textContent = "Awaiting deployment";
     return;
   }
   panel.dataset.state = "loading";
@@ -360,8 +361,20 @@ async function startLive() {
     console.warn("[gapguard] live panel unavailable:", err);
     panel.dataset.state = "error";
     $("panelStatus").textContent = "Couldn't load the chain client";
+    $("revState").textContent = "unavailable";
     return;
   }
+  let rev = null;
+  try {
+    rev = (await import("./revenue.js")).makeRevenue(NET, reader.client, $);
+    const late = () => rev.updateButton();
+    window.addEventListener("ethereum#initialized", late, { once: true });
+    window.addEventListener("load", late, { once: true });
+  } catch (err) {
+    console.warn("[gapguard] revenue panel unavailable:", err);
+    $("revState").textContent = "unavailable";
+  }
+  const revPanel = $("rev");
   let fails = 0;
   const poll = async () => {
     try {
@@ -376,6 +389,17 @@ async function startLive() {
       console.warn("[gapguard] read failed:", err && err.shortMessage ? err.shortMessage : err);
       panel.dataset.state = "error";
       $("panelStatus").textContent = fails > 1 ? `RPC unreachable · retrying (${fails})` : "RPC read failed · retrying";
+    }
+    if (rev) {
+      try {
+        await rev.refresh();
+        revPanel.dataset.state = "live";
+        $("revState").textContent = "live · refreshes with the pool";
+      } catch (err) {
+        console.warn("[gapguard] revenue read failed:", err && err.shortMessage ? err.shortMessage : err);
+        revPanel.dataset.state = "error";
+        $("revState").textContent = "read failed · retrying";
+      }
     }
     setTimeout(poll, 15000);
   };

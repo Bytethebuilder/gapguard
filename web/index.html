@@ -102,7 +102,7 @@
       <p class="sec-num">§ 02 — Live pool</p>
       <div class="sec-head">
         <h2 id="liveH">Read straight from the chain.</h2>
-        <p class="sec-lede">Every 15 seconds: the hook's own clock, the fee it would charge each way, and how far the pool sits from its time-weighted last-close anchor.</p>
+        <p class="sec-lede">Every 15 seconds: the hook's own clock, the fee it would charge each way, and how far the pool sits from its time-weighted last-close anchor, and what the hook has earned.</p>
       </div>
       <div class="panel" id="panel" data-state="idle">
         <div class="panel-top">
@@ -122,6 +122,26 @@
           The hook, demo pool and tokens go live when <code>script/Deploy.s.sol</code> is broadcast. Addresses are read from
           <code>web/config.js</code>; until then this panel stays empty on purpose.
         </p>
+      </div>
+
+      <div class="panel rev" id="rev" data-state="idle" aria-labelledby="revH">
+        <div class="panel-top">
+          <span class="dot" aria-hidden="true"></span>
+          <h3 id="revH" class="rev-h">Hook revenue</h3>
+          <span class="panel-net" id="revState">awaiting deployment</span>
+        </div>
+        <div class="rev-body">
+          <p class="rev-lede">The hook's 15% of closed-market surcharges builds up as ERC-6909 claims on the PoolManager.
+            <code>collect</code> turns claims into tokens, <code>distribute</code> books them to the two fixed recipients, <code>withdraw</code> pays out.</p>
+          <p class="rev-recipients" id="revRecipients"></p>
+          <div class="rev-table" id="revTable" role="table" aria-label="Hook revenue by token"></div>
+          <div class="rev-action">
+            <button type="button" class="btn" id="revCollect" disabled>Checking…</button>
+            <p class="rev-honest">Anyone can trigger this — funds only go to the recipients shown. Each step is simulated before you sign.</p>
+          </div>
+          <ol class="rev-log" id="revLog" aria-live="polite"></ol>
+          <p class="rev-status" id="revStatus" aria-live="polite"></p>
+        </div>
       </div>
     </section>
 

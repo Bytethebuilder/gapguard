@@ -9,7 +9,7 @@ import {
   pad,
   toHex,
   getAddress,
-} from "https://esm.sh/viem@2.21.55?bundle&exports=concat,createPublicClient,encodeAbiParameters,getAddress,http,keccak256,pad,toHex";
+} from "./viem.js";
 
 export const DYNAMIC_FEE_FLAG = 0x800000;
 const POOLS_SLOT = 6n; // StateLibrary.POOLS_SLOT
@@ -120,5 +120,5 @@ export function makeReader(cfg) {
     };
   }
 
-  return { snapshot, key, poolId };
+  return { snapshot, key, poolId, client };
 }

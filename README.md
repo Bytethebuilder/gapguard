@@ -21,6 +21,10 @@ Across the chain's top pools, **zero used a dynamic fee**. Nothing priced the cl
 | Demo pool | gSTOCK [`0x7991…13AD`](https://robinhoodchain.blockscout.com/address/0x7991b23378788C45F57809805aEA1a9C560113AD) / gUSD [`0xF5A9…0C85`](https://robinhoodchain.blockscout.com/address/0xF5A9f3D0bE7F0f82528a242cEA4C4A1f04Cd0C85), dynamic fee, tick spacing 60 |
 | Locked demo liquidity | [`0x78eb…5A20`](https://robinhoodchain.blockscout.com/address/0x78eb9e5D3465f05C2c3dc9C855540B1420d95A20) |
 | Uniswap v4 PoolManager | `0x8366a39CC670B4001A1121B8F6A443A643e40951` |
+| Source verification | [Sourcify — runtime match](https://sourcify.dev/server/v2/contract/4663/0x17DaD741593cEf7801c8C80c92Bb987766cA90C4) |
+
+The site's **Hook revenue** panel shows the hook's pending fees, and its one **Collect fees** button
+runs `collect` → `distribute` → `withdraw` from any wallet (funds only ever go to the recipients).
 
 The demo tokens are fixed-supply and worthless by design; they exist so the hook can be exercised
 live without touching a real tokenized stock.
