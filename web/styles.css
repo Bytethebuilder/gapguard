@@ -357,3 +357,11 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
 .how-notes p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--paper-2); padding-top: 14px; border-top: 1px solid var(--rule); }
 .how-notes b { display: block; font-weight: 500; color: var(--paper); margin-bottom: 4px; }
 @media (max-width: 1000px) { .how-notes { grid-template-columns: 1fr; } }
+.ft-row.limit .ft-fee { color: var(--paper); }
+.limits { margin-top: clamp(40px, 6vw, 72px); padding: 24px 28px; border: 1px dashed var(--rule); background: var(--ink-2); }
+.limits-h { margin: 0 0 12px; font: 500 12px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--brass); }
+.limits ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px clamp(16px, 3vw, 40px); }
+.limits li { font-size: 15px; line-height: 1.5; color: var(--paper-2); }
+.limits b { display: block; font-weight: 500; color: var(--paper); margin-bottom: 4px; }
+@media (max-width: 1000px) { .limits ul { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .limits { padding: 18px; } }

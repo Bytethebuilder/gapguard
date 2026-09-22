@@ -30,9 +30,10 @@ const HOOK_ABI = [
     type: "function", name: "anchorTick", stateMutability: "view",
     inputs: [{ name: "id", type: "bytes32" }], outputs: [{ type: "int24" }],
   },
-  ...["baseFee", "closedSurcharge", "driftCoefficient", "maxDriftSurcharge", "closedSkim"].map((name) => ({
+  ...["baseFee", "closedSurcharge", "driftCoefficient", "maxDriftSurcharge", "maxClosedMoveTicks"].map((name) => ({
     type: "function", name, stateMutability: "view", inputs: [], outputs: [{ type: "uint24" }],
   })),
+  { type: "function", name: "skimBips", stateMutability: "view", inputs: [], outputs: [{ type: "uint16" }] },
 ];
 
 const PM_ABI = [
@@ -87,9 +88,9 @@ export function makeReader(cfg) {
   const read = (functionName, args = []) => client.readContract({ address: hook, abi: HOOK_ABI, functionName, args });
 
   const params = Promise.all(
-    ["baseFee", "closedSurcharge", "driftCoefficient", "maxDriftSurcharge", "closedSkim"].map((n) => read(n))
-  ).then(([baseFee, closedSurcharge, driftCoefficient, maxDriftSurcharge, closedSkim]) => ({
-    baseFee, closedSurcharge, driftCoefficient, maxDriftSurcharge, closedSkim,
+    ["baseFee", "closedSurcharge", "driftCoefficient", "maxDriftSurcharge", "maxClosedMoveTicks", "skimBips"].map((n) => read(n))
+  ).then(([baseFee, closedSurcharge, driftCoefficient, maxDriftSurcharge, maxClosedMoveTicks, skimBips]) => ({
+    baseFee, closedSurcharge, driftCoefficient, maxDriftSurcharge, maxClosedMoveTicks: Number(maxClosedMoveTicks), skimBips,
   })).catch(() => null);
 
   const key = cfg.stock && cfg.usd ? poolKey(cfg) : null;

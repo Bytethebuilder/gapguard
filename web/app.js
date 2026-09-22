@@ -85,11 +85,13 @@ tickClock();
 setTimeout(function loop() { tickClock(); setTimeout(loop, 1000 - (Date.now() % 1000) + 5); }, 1000 - (Date.now() % 1000));
 
 // ------------------------------------------------------------------ fee model (Deploy.s.sol defaults)
-// Closed market: base + closed is paid by every swap; drift is charged on where the swap ENDS
-// (only if it ends further from the anchor than it started, or crosses it). The hook's 15% comes
-// out of the surcharges — never on top — so the buyer's total is unchanged by the hook.
-const P = { base: 3000, closed: 2000, coef: 20, maxDrift: 45000, skimBips: 1500 };
-const driftFee = (ticks) => Math.min(ticks * P.coef, P.maxDrift);
+// Closed market, all through the LP fee (dynamic override in beforeSwap):
+//   surcharge = closed 0.20%, plus — for a swap moving price AWAY from the anchor (or any swap at zero
+//   drift) — min((|pre-swap drift| + maxMove/2) × 0.002%, 4.5%). Drift is priced at the midpoint of a
+//   full 100-tick step. The hook's 15% is taken out of the surcharge, never on top.
+const P = { base: 3000, closed: 2000, coef: 20, maxDrift: 45000, skimBips: 1500, maxMove: 100 };
+const driftFee = (ticks) => Math.min((ticks + P.maxMove / 2) * P.coef, P.maxDrift);
+const CAP_TICKS = P.maxDrift / P.coef - P.maxMove / 2; // 2200
 const awayFee = (ticks) => P.base + P.closed + driftFee(ticks);
 const towardFee = () => P.base + P.closed;
 const hookShare = (ticks) => ((P.closed + driftFee(ticks)) * P.skimBips) / 10000;
@@ -118,9 +120,9 @@ function drawSim(t) {
   const R = SIM.W - SIM.r;
   g += `<path class="l-open" d="M${SIM.l},${sy(P.base)}H${R}"/>`;
   g += `<path class="l-toward" d="M${SIM.l},${sy(towardFee())}H${R}"/>`;
-  g += `<path class="l-away" d="M${SIM.l},${sy(awayFee(0))}L${sx(2250)},${sy(awayFee(2250))}H${R}"/>`;
-  g += `<text class="lbl a" x="${R + 8}" y="${sy(50000) + 4}">further or</text><text class="lbl a" x="${R + 8}" y="${sy(50000) + 19}">across 5.00%</text>`;
-  g += `<text class="lbl t" x="${R + 8}" y="${sy(towardFee()) - 4}">closer 0.50%</text>`;
+  g += `<path class="l-away" d="M${SIM.l},${sy(awayFee(0))}L${sx(CAP_TICKS)},${sy(awayFee(CAP_TICKS))}H${R}"/>`;
+  g += `<text class="lbl a" x="${R + 8}" y="${sy(50000) + 4}">away from</text><text class="lbl a" x="${R + 8}" y="${sy(50000) + 19}">anchor 5.00%</text>`;
+  g += `<text class="lbl t" x="${R + 8}" y="${sy(towardFee()) - 4}">toward 0.50%</text>`;
   g += `<text class="lbl o" x="${R + 8}" y="${sy(P.base) + 12}">open 0.30%</text>`;
   g += `<line class="cross" x1="${sx(t)}" x2="${sx(t)}" y1="${SIM.t}" y2="${sy(0)}"/>`;
   g += `<circle class="pt-a" cx="${sx(t)}" cy="${sy(awayFee(t))}" r="6"/>`;
@@ -134,12 +136,14 @@ function updateSim() {
   setRangeFill(input);
   $("driftOut").textContent = "+" + driftPct(t).toFixed(1) + "%";
   $("driftTicks").textContent = t.toLocaleString("en-US");
-  $("feeToward").textContent = pct(towardFee());
+  $("feeToward").textContent = pct(t === 0 ? awayFee(0) : towardFee());
   $("feeAway").textContent = pct(awayFee(t));
   const lp = awayFee(t) - hookShare(t);
-  $("feeAwayN").textContent = (t * P.coef >= P.maxDrift ? "drift at its +4.50% cap" : `0.50% + ${pct(driftFee(t), 3)} drift on the end position`) +
+  $("feeAwayN").textContent = (driftFee(t) >= P.maxDrift ? "drift at its +4.50% cap" : `0.50% + ${pct(driftFee(t), 3)} drift, priced at (distance + 50 ticks)`) +
     ` · LPs ${pct(lp, 3)}, hook ${pct(hookShare(t), 3)}`;
-  $("feeTowardN").textContent = `restores the peg — no drift · LPs 0.470%, hook 0.030%`;
+  $("feeTowardN").textContent = t === 0
+    ? "at zero drift both directions are away, so both pay the 0.10% midpoint drift"
+    : `restores the peg, no drift · LPs 0.470%, hook 0.030%`;
   drawSim(t);
 }
 $("drift").addEventListener("input", updateSim);
@@ -196,7 +200,7 @@ let bars = `<text class="tick" x="${C.l - 8}" y="${barY(50000) + 4}" text-anchor
   `<line class="ax" x1="${C.l}" x2="${C.W - C.r}" y1="${barBottom}" y2="${barBottom}"/><g class="fade">`;
 const bw = (C.W - C.l - C.r) / N;
 G_ALL.forEach((f, i) => {
-  bars += `<rect class="bar-g${f >= 50000 ? " cap" : ""}" x="${(cx(i) + 1.5).toFixed(1)}" y="${barY(f).toFixed(1)}" width="${(bw - 3).toFixed(1)}" height="${(barBottom - barY(f)).toFixed(1)}"/>`;
+  bars += `<rect class="bar-g${f >= 49500 ? " cap" : ""}" x="${(cx(i) + 1.5).toFixed(1)}" y="${barY(f).toFixed(1)}" width="${(bw - 3).toFixed(1)}" height="${(barBottom - barY(f)).toFixed(1)}"/>`;
 });
 bars += `<line class="l-static" x1="${C.l}" x2="${C.W - C.r}" y1="${barY(2999)}" y2="${barY(2999)}"/>` +
   `<text class="lbl a" x="${C.W - C.r + 8}" y="${barY(gMax) + 8}">${pct(gMax)}</text><text class="lbl s" x="${C.W - C.r + 8}" y="${barY(2999) + 2}">0.30%</text></g>`;
@@ -297,7 +301,7 @@ function ago(sec) {
 
 function dirTag(open, drift, zeroForOne) {
   if (open) return `<span class="tag">BASE</span>`;
-  if (drift === 0) return `<span class="tag">AT ANCHOR</span>`;
+  if (drift === 0) return `<span class="tag away">AT ANCHOR</span>`; // both directions count as away
   const away = (drift > 0 && !zeroForOne) || (drift < 0 && zeroForOne);
   return away ? `<span class="tag away">AWAY</span>` : `<span class="tag toward">TOWARD</span>`;
 }
@@ -306,7 +310,8 @@ function renderSnapshot(s, reader) {
   const now = Math.floor(Date.now() / 1000);
   const local = isOpen(now);
   setRo("roOpen", s.open ? "OPEN" : "CLOSED",
-    `isMarketOpen() · ${s.open === local ? "matches page clock" : "differs from page clock (block time)"}`, s.open ? "open" : "closed");
+    `isMarketOpen() · ${s.open === local ? "matches page clock" : "differs from page clock (block time)"}` +
+    (s.params ? ` · while closed, one swap moves ≤ ${s.params.maxClosedMoveTicks} ticks (maxClosedMoveTicks)` : ""), s.open ? "open" : "closed");
 
   if (!s.key) {
     for (const id of ["roBuy", "roSell", "roDrift", "roRef", "roTick"]) setRo(id, "—", "set <code>stock</code> + <code>usd</code> in config.js");
@@ -317,8 +322,8 @@ function renderSnapshot(s, reader) {
     const buyZfo = !s.key.stockIs0; // paying USD for stock
     const buyFee = buyZfo ? s.fee0For1 : s.fee1For0;
     const sellFee = buyZfo ? s.fee1For0 : s.fee0For1;
-    setRo("roBuy", pct(buyFee) + dirTag(s.open, d, buyZfo), `quoteFee(id, ${buyZfo}) · marginal swap; a larger one pays drift on where it ends`);
-    setRo("roSell", pct(sellFee) + dirTag(s.open, d, !buyZfo), `quoteFee(id, ${!buyZfo}) · marginal swap`);
+    setRo("roBuy", pct(buyFee) + dirTag(s.open, d, buyZfo), `quoteFee(id, ${buyZfo}) · same for any size`);
+    setRo("roSell", pct(sellFee) + dirTag(s.open, d, !buyZfo), `quoteFee(id, ${!buyZfo}) · same for any size`);
     const stockTicks = s.key.stockIs0 ? d : -d;
     const dp = driftPct(stockTicks);
     setRo("roDrift", (dp >= 0 ? "+" : "") + dp.toFixed(2) + "%", `${d > 0 ? "+" : ""}${d} ticks · stock price vs anchor`);
@@ -327,7 +332,7 @@ function renderSnapshot(s, reader) {
   }
 
   const p = s.params;
-  const paramNote = p ? ` Onchain params: base ${pct(Number(p.baseFee))}, closed +${pct(Number(p.closedSurcharge))}, drift ${pct(Number(p.driftCoefficient), 3)}/tick, cap +${pct(Number(p.maxDriftSurcharge))}, hook share of closed surcharge ${pct(Number(p.closedSkim), 3)}.` : "";
+  const paramNote = p ? ` Onchain params: base ${pct(Number(p.baseFee))}, closed +${pct(Number(p.closedSurcharge))}, drift ${pct(Number(p.driftCoefficient), 3)}/tick, cap +${pct(Number(p.maxDriftSurcharge))}, max move per closed swap ${p.maxClosedMoveTicks} ticks, hook share ${Number(p.skimBips) / 100}% of the surcharge.` : "";
   $("panelFoot").innerHTML =
     `Hook <a href="${esc(addrUrl(NET.hook))}" target="_blank" rel="noopener">${esc(short(NET.hook))}</a>` +
     (reader.poolId ? ` · poolId <code title="${esc(reader.poolId)}">${esc(short(reader.poolId))}</code>` : "") +

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gapguard — the hook that prices the closed market</title>
-  <meta name="description" content="Gapguard is a Uniswap v4 hook for tokenized stocks on Robinhood Chain. Base fee while NYSE is open; a gap-risk surcharge while it is closed, and a drift surcharge on swaps that end further from the last close." />
+  <meta name="description" content="Gapguard is a Uniswap v4 hook for tokenized stocks on Robinhood Chain. Base fee while NYSE is open; a gap-risk surcharge while it is closed, and a drift surcharge on swaps that push price away from the last close." />
   <meta name="theme-color" content="#0e0c09" />
   <meta property="og:title" content="Gapguard" />
   <meta property="og:description" content="The stock market closes at four. The pool never does. A Uniswap v4 hook that prices the closed market." />
@@ -42,8 +42,8 @@
         </h1>
         <p class="lede reveal">
           Tokenized stocks trade 24/7. The real stock doesn't. Gapguard charges the base fee while NYSE is open,
-          and while it's closed makes every swap pay for the gap risk it creates — most of all the swaps that leave price
-          <em>further</em> from the last close.
+          and while it's closed makes every swap pay for the gap risk it creates — most of all the swaps that push price
+          <em>away</em> from the last close.
         </p>
       </div>
 
@@ -135,57 +135,72 @@
 
       <div class="fee-table" role="table" aria-label="Gapguard fee schedule">
         <div class="ft-row ft-head" role="row">
-          <span role="columnheader">Market</span><span role="columnheader">Where the swap ends</span><span role="columnheader">Buyer pays</span><span role="columnheader">Split</span>
+          <span role="columnheader">Market</span><span role="columnheader">Swap direction</span><span role="columnheader">Buyer pays</span><span role="columnheader">Split</span>
         </div>
         <div class="ft-row open" role="row">
           <span role="cell"><i class="chip c-open">Open</i></span>
-          <span role="cell">Anywhere. The <em>last-close</em> anchor follows prices that hold during market hours.</span>
+          <span role="cell">Either way. The <em>last-close</em> anchor follows prices that hold during market hours.</span>
           <span role="cell" class="ft-fee">0.30%</span>
           <span role="cell">All to LPs. Hook: nothing.</span>
         </div>
         <div class="ft-row" role="row">
           <span role="cell"><i class="chip c-closed">Closed</i></span>
-          <span role="cell">Closer to the anchor than it started, without crossing it</span>
+          <span role="cell">Toward the anchor</span>
           <span role="cell" class="ft-fee">0.50%</span>
           <span role="cell">LPs 0.47% · hook 0.03% (15% of the 0.20% surcharge)</span>
         </div>
         <div class="ft-row away" role="row">
           <span role="cell"><i class="chip c-closed">Closed</i></span>
-          <span role="cell">Further from the anchor — <em>or across it</em>, so an overshoot pays too</span>
-          <span role="cell" class="ft-fee">0.50% + drift<small>min(|end tick − anchor| × 0.002%, 4.50%) · max 5.00%</small></span>
-          <span role="cell">Drift donated to in-range LPs, minus the hook's 15%</span>
+          <span role="cell">Away from the anchor — or either way at zero drift</span>
+          <span role="cell" class="ft-fee">0.50% + drift<small>min((|drift| + 50 ticks) × 0.002%, 4.50%) · 0.60% at zero drift · max 5.00%</small></span>
+          <span role="cell">LPs 85% of the surcharge · hook 15%</span>
+        </div>
+        <div class="ft-row limit" role="row">
+          <span role="cell"><i class="chip c-closed">Closed</i></span>
+          <span role="cell">Any swap</span>
+          <span role="cell" class="ft-fee">≤ 100 ticks<small>max price move per swap (~1%) · larger swaps revert</small></span>
+          <span role="cell">Bigger repricing takes several swaps</span>
         </div>
       </div>
       <div class="how-notes">
-        <p><b>Drift is charged on where the swap ends.</b> It's measured on the real post-swap price, so pushing price far in one big swap pays the full distance. A swap back toward the anchor that overshoots it pays drift on the overshoot.</p>
+        <p><b>Everything is an LP fee.</b> The surcharges are set through v4's dynamic fee override before the swap, so they accrue along the swap's path to the liquidity that actually filled it. There's no lump-sum payout for just-in-time liquidity to grab, and <code>quoteFee</code> doesn't depend on swap size.</p>
+        <p><b>Splitting doesn't make it cheaper.</b> While closed, one swap can move the price at most 100 ticks. Drift is priced at the midpoint of a full step (distance + 50 ticks), so many small swaps never cost less than one swap at the limit — at most ~0.1% more.</p>
         <p><b>The anchor is time-weighted.</b> Prices that hold during market hours reach full weight after 30 minutes, so a push just before the close barely moves it. Closed-market prices carry no weight.</p>
-        <p><b>The hook is paid out of the surcharges, never on top.</b> While closed the LP fee is 0.47% and the hook takes 0.03% through its return delta, so buyers pay 0.50% either way.</p>
       </div>
-      <p class="fine">Base 0.30% · closed surcharge +0.20% · drift 0.002% per tick (≈1 bp of price) of final distance, capped at +4.50% · contract hard cap on base + surcharges 10% ·
-        hook's share 15% of the surcharges (hard cap 20%), split 30% protocol / 70% pool operator, paid out pull-based. The live panel's <code>quoteFee</code> is the fee for a marginal swap; a larger swap pays drift on its end position.
+      <p class="fine">Base 0.30% · closed surcharge +0.20% · drift 0.002% per tick (≈1 bp of price) of (distance + 50), capped at +4.50% · contract hard cap on base + surcharges 10% ·
+        hook's share 15% of the surcharge, taken out of it (LP fee = base + surcharge − hook share; hard cap 20%), booked as ERC-6909 claims, turned into tokens by <code>collect</code>, split 30% protocol / 70% pool operator via pull-based <code>distribute</code>/<code>withdraw</code>.
         Session 09:30–16:00 ET with US daylight saving; NYSE holidays and 13:00 early closes are computed by rule, so the calendar never expires.</p>
 
       <div class="sim">
         <div class="sim-ctl">
-          <label for="drift" class="sim-label">Where the swap ends · distance from the anchor</label>
+          <label for="drift" class="sim-label">Pool's distance from the anchor before the swap</label>
           <output id="driftOut" for="drift" class="sim-out">+0.0%</output>
           <input type="range" id="drift" min="0" max="3000" step="10" value="900" aria-describedby="driftHelp" />
-          <p id="driftHelp" class="sim-help"><span id="driftTicks">900</span> ticks · market closed · cap reached at 2,250 ticks (≈ +25.2%)</p>
+          <p id="driftHelp" class="sim-help"><span id="driftTicks">900</span> ticks · market closed · drift cap reached at 2,200 ticks (≈ +24.6%) · each swap moves ≤ 100 ticks</p>
         </div>
         <div class="sim-out-grid">
           <div class="sim-card toward">
-            <span class="sim-k">Ends closer to the anchor</span>
+            <span class="sim-k">Toward the anchor</span>
             <span class="sim-v" id="feeToward">0.50%</span>
-            <span class="sim-n" id="feeTowardN">restores the peg — no drift</span>
+            <span class="sim-n" id="feeTowardN">restores the peg, no drift</span>
           </div>
           <div class="sim-card away">
-            <span class="sim-k">Ends further out — or across it</span>
-            <span class="sim-v" id="feeAway">0.50%</span>
+            <span class="sim-k">Away from the anchor</span>
+            <span class="sim-v" id="feeAway">0.60%</span>
             <span class="sim-n" id="feeAwayN">pays for the risk it adds</span>
           </div>
         </div>
-        <svg class="sim-chart" id="simChart" viewBox="0 0 640 250" role="img" aria-label="Buyer's fee versus where the swap ends: swaps ending closer to the anchor stay at 0.50%; swaps ending further out or across it rise to a 5.00% cap"></svg>
+        <svg class="sim-chart" id="simChart" viewBox="0 0 640 250" role="img" aria-label="Buyer's fee versus the pool's distance from the anchor: swaps toward the anchor pay 0.50%; swaps away pay 0.60% at zero drift rising to a 5.00% cap"></svg>
       </div>
+
+      <aside class="limits">
+        <p class="limits-h">Limits, stated plainly</p>
+        <ul>
+          <li><b>Size while closed.</b> A closed-market swap that would move the price more than ~1% reverts, and the standard v4 router can't partially fill, so the largest trade is roughly the pool's depth over 1%. Quoters simulate the hook, so aggregators see the revert and route elsewhere. If LPs pull liquidity for the weekend the pool gets thin — that's the point, but it's a real constraint.</li>
+          <li><b>Approximate quote.</b> The hook's share is charged on the swap's unspecified amount (the output for exact-input swaps), so <code>quoteFee</code> is off by a hair.</li>
+          <li><b>Fixed forever.</b> Unscheduled closures or new NYSE holidays read as open unless listed at deployment. A stock split needs more repricing than the closed-market limit allows until the market reopens.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- ============================== REPLAY ============================== -->
@@ -193,25 +208,25 @@
       <p class="sec-num">§ 04 — Weekend replay</p>
       <div class="sec-head">
         <h2 id="replayH">Same squeeze. Different winners.</h2>
-        <p class="sec-lede">30 one-way buys of 1.6 quote tokens while the market is closed, through two identically-funded pools: a static 0.30% pool and a Gapguard pool. Measured onchain from LP fee growth, donations and the hook's balance, valued in quote tokens at the post-swap price. Per-buy output of <code>forge test --mc ReplaySeries -vv</code>.</p>
+        <p class="sec-lede">30 one-way buys of 1.6 quote tokens while the market is closed, through two identically-funded pools: a static 0.30% pool and a Gapguard pool. Each buy is routed in ≤100-tick steps. Measured onchain from LP fee growth and the hook's balance, valued in quote tokens at the post-swap price. Per-buy output of <code>forge test --mc ReplaySeries -vv</code>.</p>
       </div>
 
       <dl class="stats">
-        <div><dt>Premium over last close</dt><dd><span class="s">+118.6%</span><span class="g">+118.4%</span></dd></div>
-        <div><dt>LP income</dt><dd><span class="s">0.143</span><span class="g">1.879</span><em class="mult">13.1×</em></dd></div>
-        <div><dt>All-in cost to buyers</dt><dd><span class="s">0.30%</span><span class="g">4.55%</span></dd></div>
-        <div><dt>Hook revenue</dt><dd><span class="s">0</span><span class="g">0.306</span></dd></div>
+        <div><dt>Premium over last close</dt><dd><span class="s">+118.6%</span><span class="g">+113.6%</span></dd></div>
+        <div><dt>LP income</dt><dd><span class="s">0.144</span><span class="g">1.834</span><em class="mult">12.7×</em></dd></div>
+        <div><dt>All-in cost to buyers</dt><dd><span class="s">0.30%</span><span class="g">4.43%</span></dd></div>
+        <div><dt>Hook revenue</dt><dd><span class="s">0</span><span class="g">0.289</span></dd></div>
       </dl>
       <p class="legend" aria-hidden="true"><span class="lg s">Static 0.30%</span><span class="lg g">Gapguard</span></p>
 
       <div class="charts">
         <figure class="chart-fig">
           <figcaption>Premium over the last close</figcaption>
-          <svg id="chartPremium" class="chart" viewBox="0 0 560 300" role="img" aria-label="Premium over last close after each buy. Static pool ends at 118.6%, Gapguard at 118.4%: essentially the same."></svg>
+          <svg id="chartPremium" class="chart" viewBox="0 0 560 300" role="img" aria-label="Premium over last close after each buy. Static pool ends at 118.6%, Gapguard at 113.6%: only modestly lower."></svg>
         </figure>
         <figure class="chart-fig">
           <figcaption>Cumulative all-in cost to buyers <span>(quote tokens, LPs + hook)</span> · per buy below</figcaption>
-          <svg id="chartFees" class="chart" viewBox="0 0 560 300" role="img" aria-label="Cumulative all-in cost paid by buyers. Static pool 0.144, all to LPs. Gapguard 2.186, of which 1.879 to LPs and 0.306 to the hook."></svg>
+          <svg id="chartFees" class="chart" viewBox="0 0 560 300" role="img" aria-label="Cumulative all-in cost paid by buyers. Static pool 0.144, all to LPs. Gapguard 2.124, of which 1.834 to LPs and 0.289 to the hook."></svg>
         </figure>
       </div>
 
@@ -222,8 +237,8 @@
       </div>
 
       <aside class="honest">
-        <p><strong>Stated plainly:</strong> Gapguard doesn't stop a squeeze driven by real demand — the premium is essentially unchanged.
-          What it changes is <em>who gets paid for it</em>: LPs earn 13× more for carrying the weekend gap.
+        <p><strong>Stated plainly:</strong> a fee can't stop a squeeze driven by real demand — the premium falls only modestly.
+          What Gapguard changes is <em>who gets paid for it</em>: LPs earn about 13× more for carrying the weekend gap, paid by the flow that creates it.
           This is a calibrated model of the event run in Foundry, not a replay of its actual transactions.</p>
       </aside>
 
@@ -241,11 +256,15 @@
         <li><b>No owner</b><span>No admin, no pause, no proxy. Nothing to upgrade, nothing to seize.</span></li>
         <li><b>Immutable</b><span>Every fee parameter, the unscheduled-closure list and both fee recipients are fixed at construction.</span></li>
         <li><b>≤ 10%</b><span><code>MAX_TOTAL_FEE</code> caps base + surcharges, checked in the constructor.</span></li>
-        <li><b>≤ 20%</b><span><code>MAX_SKIM_BIPS</code> caps the hook's share — taken out of the surcharges, never on top and never from the base fee.</span></li>
-        <li><b class="nc">onlyPoolManager</b><span>Every hook callback rejects any caller but the v4 PoolManager.</span></li>
+        <li><b>≤ 20%</b><span><code>MAX_SKIM_BIPS</code> caps the hook's share — taken out of the surcharge, never on top and never from the base fee.</span></li>
+        <li><b>≤ 100 ticks</b><span>While closed, <code>maxClosedMoveTicks</code> caps how far one swap can move the price, enforced in <code>afterSwap</code>.</span></li>
+        <li><b class="nc">onlyPoolManager</b><span>Every hook callback rejects any caller but the v4 PoolManager; ETH is only accepted from it.</span></li>
         <li><b>Dynamic fee</b><span><code>afterInitialize</code> reverts unless the pool is a dynamic-fee pool.</span></li>
-        <li><b>No LP access</b><span>No liquidity callbacks. The hook can't touch positions; drift is donated to in-range LPs.</span></li>
+        <li><b>No LP access</b><span>Liquidity permission bits are unset. The hook can't touch positions.</span></li>
+        <li><b>Pull payouts</b><span>The hook's share is booked as ERC-6909 claims; anyone can <code>collect</code>, recipients <code>withdraw</code>. One can't block the other.</span></li>
         <li><b>No oracle</b><span>The session clock runs from <code>block.timestamp</code>: DST, NYSE holidays and early closes by rule. No keeper, no list to expire.</span></li>
+        <li><b>Reviewed ×3</b><span>Reviewed adversarially three times. Every confirmed finding is fixed and pinned by a test.</span></li>
+        <li><b>Locked demo LP</b><span>The demo pool's liquidity sits in an add-only holder: it can never be removed. Demo tokens are worthless by design.</span></li>
       </ul>
     </section>
   </main>
