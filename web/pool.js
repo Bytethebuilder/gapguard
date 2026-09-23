@@ -43,6 +43,9 @@ const PM_ABI = [
   },
 ];
 
+/** Same-origin proxy when served from the deployed site; the public RPC everywhere else (local dev). */
+const readUrl = (cfg) => (cfg.readRpc && /vercel\.app$|gapguard/.test(location.hostname) ? new URL(cfg.readRpc, location.href).href : cfg.rpc);
+
 /** Sorted PoolKey for a stock/usd pair bound to the hook. */
 export function poolKey(cfg) {
   const a = getAddress(cfg.stock);
@@ -83,7 +86,7 @@ export function decodeSlot0(word) {
 }
 
 export function makeReader(cfg) {
-  const client = createPublicClient({ transport: http(cfg.rpc, { timeout: 10_000, retryCount: 1 }) });
+  const client = createPublicClient({ transport: http(readUrl(cfg), { timeout: 10_000, retryCount: 1 }) });
   const hook = getAddress(cfg.hook);
   const read = (functionName, args = []) => client.readContract({ address: hook, abi: HOOK_ABI, functionName, args });
 

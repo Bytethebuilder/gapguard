@@ -1,0 +1,13 @@
+{
+  "_note": "Quote assets accepted as a USD or ETH price. Checked by hand (see research/README.md). Anything else counts as an unpriced 'other' quote.",
+  "stables": [
+    { "symbol": "USDG", "address": "0x5fc5360d0400a0fd4f2af552add042d716f1d168", "check": "name() = Global Dollar, decimals 6; quote asset of 8,306 stock pools (the most common by far)" }
+  ],
+  "eth": [
+    { "symbol": "ETH", "address": "0x0000000000000000000000000000000000000000", "check": "native currency in v4" },
+    { "symbol": "WETH", "address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73", "check": "symbol WETH, decimals 18; quote asset of 662 stock pools" }
+  ],
+  "excluded": [
+    { "symbol": "wUSDG", "address": "0x0ff7a742b035504118a9d435c8264619a8428e1c", "reason": "name() = Wrapped Global Dollar, asset() = USDG, but it holds 0 USDG against 1e14 supply at time of check; backing could not be verified onchain, so it is not treated as a dollar" }
+  ]
+}

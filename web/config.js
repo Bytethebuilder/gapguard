@@ -4,7 +4,8 @@
 
 export const CONFIG = {
   chainId: 4663,
-  rpc: "https://rpc.mainnet.chain.robinhood.com",
+  rpc: "https://rpc.mainnet.chain.robinhood.com", // public RPC — handed to wallets
+  readRpc: "/api/rpc", // page reads go through the site's own origin (api/rpc.js), so RPC CORS quirks can't break the panel
   explorer: "https://robinhoodchain.blockscout.com",
   poolManager: "0x8366a39CC670B4001A1121B8F6A443A643e40951",
   hook: "0x17DaD741593cEf7801c8C80c92Bb987766cA90C4",
@@ -16,6 +17,7 @@ export const CONFIG = {
 export const TESTNET = {
   chainId: 46630,
   rpc: "https://rpc.testnet.chain.robinhood.com/rpc",
+  readRpc: "/api/rpc?net=testnet",
   explorer: "https://explorer.testnet.chain.robinhood.com",
   poolManager: "0x8366a39CC670B4001A1121B8F6A443A643e40951", // same address on testnet (verified: code present)
   hook: null,

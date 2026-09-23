@@ -10,7 +10,10 @@ real close.
 On 29–31 Aug 2026 a memecoin routed its main liquidity as BONER/HIMS on Robinhood Chain. Every
 dollar of meme demand became a forced bid for tokenized Hims & Hers. The wrapper printed **$61.15
 against a $28.84 NYSE close — a 112% premium** — and collapsed within hours of minting reopening.
-Across the chain's top pools, **zero used a dynamic fee**. Nothing priced the closed market.
+It isn't a one-off. Over 21 days on Robinhood Chain (Aug 31 – Sep 21, 2026), **72.5% of the dollar
+volume in tokenized-stock v4 pools ($1.29B of $1.78B) traded while NYSE was closed**, weekend prices
+drifted a median 2.4% from the last close (1 in 10 over 8.7%) — and fees barely moved after the bell
+(0.57% closed vs 0.53% open). Method, data and a reproducible script: [`research/`](research/).
 
 ## Live on Robinhood Chain
 

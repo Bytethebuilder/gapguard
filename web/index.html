@@ -24,6 +24,7 @@
       <span>Gapguard</span>
     </a>
     <nav aria-label="Sections">
+      <a href="#measured">Data</a>
       <a href="#live">Live</a>
       <a href="#how">Fees</a>
       <a href="#replay">Replay</a>
@@ -74,8 +75,8 @@
 
     <div class="tape" aria-hidden="true">
       <div class="tape-track">
-        <span>HIMS WRAPPER <b>$61.15</b></span><span>NYSE CLOSE <b>$28.84</b></span><span class="up">+112% ▲</span><span>29–31 AUG 2026</span><span>DYNAMIC-FEE POOLS IN THE TOP SET <b>0</b></span><span>ISSUER MINT/REDEEM <b>OFFLINE</b></span>
-        <span>HIMS WRAPPER <b>$61.15</b></span><span>NYSE CLOSE <b>$28.84</b></span><span class="up">+112% ▲</span><span>29–31 AUG 2026</span><span>DYNAMIC-FEE POOLS IN THE TOP SET <b>0</b></span><span>ISSUER MINT/REDEEM <b>OFFLINE</b></span>
+        <span>HIMS WRAPPER <b>$61.15</b></span><span>NYSE CLOSE <b>$28.84</b></span><span class="up">+112% ▲</span><span>29–31 AUG 2026</span><span>STOCK-POOL VOLUME WHILE NYSE CLOSED <b>72.5%</b></span><span>ISSUER MINT/REDEEM <b>OFFLINE</b></span>
+        <span>HIMS WRAPPER <b>$61.15</b></span><span>NYSE CLOSE <b>$28.84</b></span><span class="up">+112% ▲</span><span>29–31 AUG 2026</span><span>STOCK-POOL VOLUME WHILE NYSE CLOSED <b>72.5%</b></span><span>ISSUER MINT/REDEEM <b>OFFLINE</b></span>
       </div>
     </div>
 
@@ -87,8 +88,8 @@
         <p class="story-text">
           On the weekend of 29–31 August 2026 a memecoin routed its main liquidity against tokenized Hims&nbsp;&amp;&nbsp;Hers
           on Robinhood Chain. Every dollar of meme demand became a forced bid for the stock wrapper — while the exchange was shut,
-          the issuer couldn't mint, and there was no live price to arbitrage against. Across the chain's top pools,
-          <strong>none used a dynamic fee.</strong> Nothing priced the closed market.
+          the issuer couldn't mint, and there was no live price to arbitrage against. And the pools' fees
+          <strong>didn't change when the market closed.</strong> Nothing priced the gap.
         </p>
         <figure class="exhibit">
           <div class="ex-row"><span class="ex-k">NYSE close</span><span class="ex-v">$28.84</span></div>
@@ -98,9 +99,29 @@
       </div>
     </section>
 
+    <!-- ============================== MEASURED ============================== -->
+    <section class="measured" id="measured" aria-labelledby="measuredH">
+      <p class="sec-num">§ 02 — The problem, measured</p>
+      <div class="sec-head">
+        <h2 id="measuredH">Most trading happens after the bell.</h2>
+        <p class="sec-lede" id="mLede">Not one weekend: every Uniswap v4 pool holding a Robinhood stock token, measured onchain over three weeks that start the morning after the HIMS squeeze.</p>
+      </div>
+      <p class="m-window" id="mWindow"></p>
+      <dl class="stats m-stats" id="mStats"></dl>
+      <div class="m-grid">
+        <figure class="chart-fig">
+          <figcaption>Largest move while closed <span>· per closure, each stock's main USDG pool, vs its last open-market price</span></figcaption>
+          <p class="m-legend" id="mLegend" aria-hidden="true"></p>
+          <svg id="mChart" class="chart" viewBox="0 0 640 300" role="img" aria-label="Distribution of the largest price move per closure"></svg>
+        </figure>
+        <div class="m-read" id="mRead"></div>
+      </div>
+      <p class="m-note" id="mNote"></p>
+    </section>
+
     <!-- ============================== LIVE ============================== -->
     <section class="live" id="live" aria-labelledby="liveH">
-      <p class="sec-num">§ 02 — Live pool</p>
+      <p class="sec-num">§ 03 — Live pool</p>
       <div class="sec-head">
         <h2 id="liveH">Read straight from the chain.</h2>
         <p class="sec-lede">Every 15 seconds: the hook's own clock, the fee it would charge each way, and how far the pool sits from its time-weighted last-close anchor, and what the hook has earned.</p>
@@ -149,7 +170,7 @@
 
     <!-- ============================== HOW ============================== -->
     <section class="how" id="how" aria-labelledby="howH">
-      <p class="sec-num">§ 03 — How it works</p>
+      <p class="sec-num">§ 04 — How it works</p>
       <div class="sec-head">
         <h2 id="howH">Cheap to restore the peg. Expensive to stretch it.</h2>
         <p class="sec-lede">Deployed parameters, from <code>script/Deploy.s.sol</code>. All immutable.</p>
@@ -227,7 +248,7 @@
 
     <!-- ============================== REPLAY ============================== -->
     <section class="replay" id="replay" aria-labelledby="replayH">
-      <p class="sec-num">§ 04 — Weekend replay</p>
+      <p class="sec-num">§ 05 — Weekend replay</p>
       <div class="sec-head">
         <h2 id="replayH">Same squeeze. Different winners.</h2>
         <p class="sec-lede">30 one-way buys of 1.6 quote tokens while the market is closed, through two identically-funded pools: a static 0.30% pool and a Gapguard pool. Each buy is routed in ≤100-tick steps. Measured onchain from LP fee growth and the hook's balance, valued in quote tokens at the post-swap price. Per-buy output of <code>forge test --mc ReplaySeries -vv</code>.</p>
@@ -272,7 +293,7 @@
 
     <!-- ============================== SAFETY ============================== -->
     <section class="safety" id="safety" aria-labelledby="safetyH">
-      <p class="sec-num">§ 05 — Safety</p>
+      <p class="sec-num">§ 06 — Safety</p>
       <h2 id="safetyH">Nobody can turn the dial.</h2>
       <ul class="safe-list">
         <li><b>No owner</b><span>No admin, no pause, no proxy. Nothing to upgrade, nothing to seize.</span></li>
@@ -313,5 +334,6 @@ forge test --mc HimsReplay -vv</code></pre>
   </footer>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="measured.js"></script>
 </body>
 </html>
