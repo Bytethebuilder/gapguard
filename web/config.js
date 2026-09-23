@@ -25,5 +25,5 @@ export const TESTNET = {
 };
 
 export const LINKS = {
-  repo: null, // e.g. "https://github.com/<you>/gapguard"
+  repo: "https://github.com/Bytethebuilder/gapguard",
 };
