@@ -7,3 +7,4 @@ brand/video/*.mp4
 brand/video/raw/
 brand/video/frames/
 brand/voice/*.wav
+.DS_Store
